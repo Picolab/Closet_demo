@@ -10,7 +10,7 @@ ruleset closetCollection {
     logging on
     
     sharing on
-    provides fan_states,outside_temp,inside_temp,temp_thresholds
+    provides fan_states,outside_temp,inside_temp,temp_thresholds,temps
   }
 
   global {
@@ -19,6 +19,15 @@ ruleset closetCollection {
       return = wrangler:skyQuery(ecis[0],"b507888x1.dev","fanStates",{});
       return
     };
+    temps = function (){
+      inside = inside_temp();
+      outside = outside_temp();r
+      {
+        "inside": inside,
+        "outside": outside
+      }
+    };
+
     outside_temp = function (){
       ecis = Ecis("subscriber_role","transmit_outside_temp").klog("ecis: ");
       temp = wrangler:skyQuery(ecis[0],"b507888x4.dev","lastTemperature",{}).klog("tempf: ");
@@ -66,11 +75,11 @@ ruleset closetCollection {
     pre {
       ecis = Ecis("subscriber_role","transmit_inside_temp");
     }
-    if(not threshold_type.isnull()) then {
+    {
       event:send({"cid": ecis[0] },"esproto","new_threshold")
         with attrs = event:attrs();
     }
-    fired {
+    always {
       log "Setting threshold value for inside_temp";
     }
   }

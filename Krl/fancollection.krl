@@ -20,8 +20,8 @@ ruleset fanCollection {
       ecis = collectionEcis();
       fan_a = wrangler:skyQuery(ecis[0],"b507888x0.dev","fan_state",{});
       fan_b = wrangler:skyQuery(ecis[1],"b507888x0.dev","fan_state",{});
-      return1 = fan_a;
-      return2 = fan_b;
+      return1 = fan_a{"pin"};
+      return2 = fan_b{"pin"};
       {
         "fan_a" : return1,
         "fan_b" : return2
