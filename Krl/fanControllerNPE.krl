@@ -9,64 +9,56 @@ ruleset fanController {
     
     logging on
     
-    shares fan_state
-    provides fan_state
+    shares fan_state, __testing
+    provides fan_state, __testing
   }
 
   global {
+
+__testing = { "queries": [ { "name": "fan_state" } ],
+                  "events": [ 
+            { "domain": "fan", "type": "new_status",
+                                "attrs": ["state"] },
+            { "domain": "fan", "type": "set_pin",
+                                "attrs": ["pin" ] } ] }
+
     fan_state = function (){
-      json_from_url = http:get(ent:pin_state).pick("$.content").decode();
-      return = json_from_url{"value"};
-      value = return.encode();
       {
-        "pin" : value
+        "pin" : gpio:digitalRead(get_pin())
       }
     };
-    //private
+    get_pin = function(){
+       ent:pin.defaultsTo(17)
+    }
 }
 
   rule fanOn {
     select when fan new_status state re#on#
     pre {}
-    // if(ent:fan_state eq 0) then
-    http:put(ent:on_api);
-    // fan is off
+      gpio:digitalWrite(get_pin(),1) 
     always {
-      null.klog("turning on fan @ " + ent:on_api);
+      null.klog("turning on fan at pin " + get_pin());
     }
-  //  else {
-  //    log "fan is already on."
-  //  }
   }
-
 
   rule fanOff {
     select when fan new_status state re#off#
-    pre {
-
-      }
-  //  if(ent:fan_state eq 1) then 
-    
-      http:put(ent:off_api);// wont work with out https
-     // fan is on
+    pre {}
+      gpio:digitalWrite(get_pin(),0) 
     always {
-      null.klog("turning off fan @ " + ent:off_api);
+      null.klog("turning off fan at pin " + get_pin());
     }
   }
 
-  rule updateApi {
-    select when fan update_api
+  rule setPin {
+    select when fan set_pin
     pre {
-      api_on = event:attr("api_on");
-      api_off = event:attr("api_off");
-      state = event:attr("state");
+      pin = event:attr("pin");
       }
      noop();
     always {
-      null.klog("updateing api");
-      ent:pin_state := state;
-      ent:on_api := api_on;
-      ent:off_api := api_off;
+      null.klog("setting pin");
+      ent:pin := pin;
     }
   }
 
