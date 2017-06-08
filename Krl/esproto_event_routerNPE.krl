@@ -18,16 +18,16 @@ ruleset esproto_router {
     // internal functions
     sensorData = function(path) {
      gtd =  event:attr("genericThing")
-  	     .defaultsTo({})
-	     .klog("Sensor Data: ");
+         .defaultsTo({})
+       .klog("Sensor Data: ");
      path.isnull() => gtd | gtd{path}
-	     
+       
     };
 
     sensorSpecs = function() {
        event:attr("specificThing")
-		       .defaultsTo({})
-		       .klog("Sensor specs: ")
+           .defaultsTo({})
+           .klog("Sensor specs: ")
     };
 
 
@@ -89,17 +89,17 @@ ruleset esproto_router {
   // route all readings from the sensor array
   rule route_readings {
     select when wovynEmitter thingHeartbeat
-    foreach sensorData(["data"]) setting (sensor_type, sensor_readings)
+    foreach sensorData(["data"]) setting (sensor_readings, sensor_type)
       pre {
-	event_name = "new_" + sensor_type + "_reading".klog("Event ");
+  event_name = "new_" + sensor_type + "_reading".klog("Event ");
 
        }
        always {
-	 raise esproto event event_name attributes
-	   {"readings":  sensor_readings,
-	    "sensor_id": event:attr("emitterGUID"),
-  	    "timestamp": time:now()
-	   };
+   raise esproto event event_name attributes
+     {"readings":  sensor_readings,
+      "sensor_id": event:attr("emitterGUID"),
+        "timestamp": time:now()
+     }.klog("raising esproto event "+event_name+"with attrs: ");
        }
   }
 

@@ -5,20 +5,25 @@ ruleset esproto_device {
     author "PJW"
     //description "General rules for ESProto system devices"
 
-    use module b507199x5 alias wrangler
+    //use module wrangler
+    use module Subscriptions
     
     logging on
     
-    shares thresholds
+    shares thresholds, __testing
     provides thresholds
   }
 
   global {
 
+    __testing = { "queries": [ { "name": "__testing" } ],
+                  "events": [ { "domain": "esproto", "type": "new_threshold",
+                                "attrs": [ "threshold_type", "upper_limit", "lower_limit" ] } ] }
+
     // public
     thresholds = function(threshold_type) {
       threshold_type.isnull() => ent:thresholds
-                               | ent:thresholds{threshold_type}
+                               | ent:thresholds{threshold_type}.defaultsTo({})
     }
 
     //private
@@ -35,7 +40,7 @@ ruleset esproto_device {
     };
 
     Ecis = function () { 
-      return = wrangler:subscriptions(unknown,"subscriber_role","receive_temp"); 
+      return = Subscriptions:subscriptions(unknown,"subscriber_role","receive_temp"); 
       raw_subs = return{"subscriptions"}; // array of subs
       ecis = raw_subs.map(function( subs ){
         r = subs.values().klog("subs.values(): ");
@@ -46,7 +51,7 @@ ruleset esproto_device {
     };
 
     collectionSubscriptions = function () {
-        return = wrangler:subscriptions(unknown,"subscriber_role","receive_temp"); 
+        return = Subscriptions:subscriptions(unknown,"subscriber_role","receive_temp"); 
         raw_subs = return{"subscriptions"}; // array of subs
         //subs = raw_subs[0];
         raw_subs.klog("Subscriptions: ")
@@ -65,8 +70,8 @@ ruleset esproto_device {
     }
     if(not threshold_type.isnull()) then noop();
     fired {
-      null.klog("Setting threshold value for #{threshold_type}");
-      ent:thresholds := ent:thresholds.put([threshold_type], threshold_value)
+      null.klog(<<Setting threshold value for #{threshold_type}>>);
+      ent:thresholds := ent:thresholds.defaultsTo({}).put([threshold_type], threshold_value)
     }
   }
 
@@ -74,37 +79,36 @@ ruleset esproto_device {
     select when esproto new_temperature_reading
              or esproto new_humidity_reading
              or esproto new_pressure_reading
-    foreach event:attr("readings") setting (reading)
+    foreach event:attr("readings").klog("The readings: ") setting (reading)
       pre {
         event_type = event:type().klog("Event type: ");
 
         // thresholds
-  threshold_type = event_map{event_type}; 
-  threshold_map = thresholds(threshold_type).klog("Thresholds: ");
-  lower_threshold = threshold_map{["limits","lower"]}.klog("Lower threshold: ");
-  upper_threshold = threshold_map{["limits","upper"]};
+        threshold_type = event_map{event_type}.klog("threshold_type"); 
+        threshold_map = thresholds(threshold_type).klog("Thresholds: ");
+        lower_threshold = threshold_map{["limits","lower"]}.klog("Lower threshold: ");
+        upper_threshold = threshold_map{["limits","upper"]};
 
         // sensor readings
-  data = reading.klog("Reading from #{threshold_type}: ");
-  reading_value = data{reading_map{threshold_type}}.klog("Reading value for #{threshold_type}: ");
-  sensor_name = data{"name"}.klog("Name of sensor: ");
+        data = reading.klog(<<Reading from #{threshold_type}: >>);
+        reading_value = data{reading_map{threshold_type}}.klog(<<Reading value for #{threshold_type}: >>);
+        sensor_name = data{"name"}.klog("Name of sensor: ");
 
         // decide
-  under = reading_value < lower_threshold;
-  over = upper_threshold < reading_value;
-  msg = under => "#{threshold_type} is under threshold of #{lower_threshold}"
-      | over  => "#{threshold_type} is over threshold of #{upper_threshold}"
-      |          "";
+        under = reading_value < lower_threshold;
+        over = upper_threshold < reading_value;
+        msg = under => <<#{threshold_type} is under threshold of #{lower_threshold}>>
+              | over  => <<#{threshold_type} is over threshold of #{upper_threshold}>>
+              |          "";
       }
       if(  under || over ) then noop();
       fired {
-  raise esproto event "threshold_violation" attributes
-    {"reading": reading.encode(),
-     "threshold": under => lower_threshold | upper_threshold,
-     "threshold_bound": under => "lower" | "upper"
-    // "message": "threshold violation: #{msg} for #{sensor_name}"
-    }       
-
+        raise esproto event "threshold_violation" 
+          attributes { "reading": reading.encode(),
+                       "threshold": under => lower_threshold | upper_threshold,
+                       "threshold_bound": under => "lower" | "upper"
+                       // "message": <<threshold violation: #{msg} for #{sensor_name}>>
+                     }       
       }
   }
 
@@ -126,8 +130,8 @@ ruleset esproto_device {
            //name_space re/esproto-meta/gi
     pre{
       attributes = event:attrs().klog("subcription attributes :");
-      subscriptions = wrangler:subscriptions()
-                        .pick("$.subscriptions")
+      subscriptions = Subscriptions:getSubscriptions().klog("Subscriptions:subscriptions(): ")
+                        {"subscriptions"}
                         .klog(">>> current subscriptions >>>>")
       ;
       declared_relationship = "device_collection";
@@ -137,12 +141,9 @@ ruleset esproto_device {
     if ( not relationship like declared_relationship  
       || subscriptions.length() == 0
        ) then // only auto approve the first subscription request
-    
        noop();
-    
-
     fired {
-       null.klog(">>> auto approving subscription: #{relationship}");
+       null.klog(<< auto approving subscription: #{relationship}>>);
        raise wrangler event "pending_subscription_approval"
           attributes attributes;        
     }
