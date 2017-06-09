@@ -40,18 +40,18 @@ ruleset esproto_device {
     };
 
     Ecis = function () { 
-      return = Subscriptions:subscriptions(unknown,"subscriber_role","receive_temp"); 
-      raw_subs = return{"subscriptions"}; // array of subs
+      return = Subscriptions:subscriptions(["attributes","subscriber_role"],"receive_temp").klog("subscriptions:   "); 
+      raw_subs = return;//{"subscriptions"}; // array of subs
       ecis = raw_subs.map(function( subs ){
         r = subs.values().klog("subs.values(): ");
-        v = r[0];
-        v{"outbound_eci"}
+        v = r[0].klog("subscription we want");
+        v.attributes.outbound_eci
         });
       ecis.klog("ecis: ")
     };
 
     collectionSubscriptions = function () {
-        return = Subscriptions:subscriptions(unknown,"subscriber_role","receive_temp"); 
+        return = Subscriptions:subscriptions("subscriber_role","receive_temp"); 
         raw_subs = return{"subscriptions"}; // array of subs
         //subs = raw_subs[0];
         raw_subs.klog("Subscriptions: ")
@@ -121,7 +121,7 @@ ruleset esproto_device {
     foreach Ecis() setting (eci)
       pre {
       }
-      event:send({"cid": eci, "attrs": event:attrs()}, "esproto", event:type())
+      event:send({"eci": eci,"eid" : random:integer(100,2000) , "domain": "esproto", "type": event:type(), "attrs": event:attrs()})
   }
 
 

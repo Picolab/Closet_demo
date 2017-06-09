@@ -5,7 +5,8 @@ ruleset closetCollection {
     author "PicoLabs"
     //description "General rules for closet control"
 
-    use module b507199x5 alias wrangler
+    use module io.picolabs.wrangler.common alias common
+    use module Subscriptions
     
     logging on
     
@@ -14,9 +15,13 @@ ruleset closetCollection {
   }
 
   global {
+    __testing = { "queries": [ { "name": "__testing" } ],
+                  "events": [ { "domain": "test", "type": "something",
+                                "attrs": [ ] } ] }
+
     fan_states = function (){
-      ecis = Ecis("subscriber_role","fan_level_driver");
-      return = wrangler:skyQuery(ecis[0],"b507888x1.dev","fanStates",{});
+      ecis = EcisFromParams("subscriber_role","fan_level_driver");
+      return = common:skyQuery(ecis[0],"fanCollection","fanStates",{});
       return
     };
     temps = function (){
@@ -29,18 +34,18 @@ ruleset closetCollection {
     };
 
     outside_temp = function (){
-      ecis = Ecis("subscriber_role","transmit_outside_temp").klog("ecis: ");
-      temp = wrangler:skyQuery(ecis[0],"b507888x4.dev","lastTemperature",{}).klog("tempf: ");
+      ecis = EcisFromParams("subscriber_role","transmit_outside_temp").klog("ecis: ");
+      temp = common:skyQuery(ecis[0],"esproto_router","lastTemperature",{}).klog("tempf: ");
       temp
     };
     inside_temp = function (){
-      ecis = Ecis("subscriber_role","transmit_inside_temp");
-      temp = wrangler:skyQuery(ecis[0],"b507888x4.dev","lastTemperature",{});
+      ecis = EcisFromParams("subscriber_role","transmit_inside_temp");
+      temp = common:skyQuery(ecis[0],"esproto_router","lastTemperature",{});
       temp
     };
     temp_thresholds = function (){
-      ecis = Ecis("subscriber_role","transmit_inside_temp");
-      return = wrangler:skyQuery(ecis[0],"b507888x2.dev","thresholds",{ "threshold_type" : "temperature" });
+      ecis = EcisFromParams("subscriber_role","transmit_inside_temp");
+      return = common:skyQuery(ecis[0],"esproto_device","thresholds",{ "threshold_type" : "temperature" });
       return
     };
     lower_threshold = function (){
@@ -54,19 +59,30 @@ ruleset closetCollection {
       thresholds_upper
     };
     //private
-    Ecis = function (collection,collection_value) { 
-      return = wrangler:subscriptions(unknown,collection,collection_value); 
-      raw_subs = return{"subscriptions"}; // array of subs
+    Ecis = function () { 
+      return = Subscriptions:subscriptions(["attributes","subscriber_role"],"receive_temp").klog("subscriptions:   "); 
+      raw_subs = return;//{"subscriptions"}; // array of subs
       ecis = raw_subs.map(function( subs ){
         r = subs.values().klog("subs.values(): ");
-        v = r[0];
-        v{"outbound_eci"}
+        v = r[0].klog("subscription we want");
+        v.attributes.outbound_eci
+        });
+      ecis.klog("ecis: ")
+    };
+
+    EcisFromParams = function (collection,filter) { 
+      return = Subscriptions:subscriptions(["attributes",collection],filter).klog("subscriptions:   "); 
+      raw_subs = return;//{"subscriptions"}; // array of subs
+      ecis = raw_subs.map(function( subs ){
+        r = subs.values().klog("subs.values(): ");
+        v = r[0].klog("subscription we want");
+        v.attributes.outbound_eci
         });
       ecis.klog("ecis: ")
     };
 
     fan_collection_eci = function (){
-      ecis = Ecis("subscriber_role","fan_level_driver");
+      ecis = EcisFromParams("subscriber_role","fan_level_driver");
       ecis
     };
 }
@@ -75,12 +91,11 @@ ruleset closetCollection {
     pre {
       ecis = Ecis("subscriber_role","transmit_inside_temp");
     }
-    //every {
-    //  event:send({"cid": ecis[0] },"esproto","new_threshold")
-    //    with attrs = event:attrs();
-    //}
+    every {
+      event:send({"eci": ecis[0],"eid" : random:integer(100,2000) , "attrs": event:attrs(), "domain": "esproto", "type": "new_threshold" })
+    }
     always {
-      null.klog("Setting threshold value for inside_temp");
+      "Setting threshold value for inside_temp".klog(".");
     }
   }
 
@@ -96,35 +111,29 @@ ruleset closetCollection {
       airflow_level = (thresholds_diff > 3) => 2 | 1;
       fan_driver = fan_collection_eci();
     }
-    //if (inside > outside) then
-    //{
-    //  event:send({"cid": fan_driver[0] },"fan","airflow")
-    //    with attrs = {
-    //      "level" : airflow_level
-    //    };
-    //} 
+    if (inside > outside) then every
+    {
+      event:send({"eci": fan_driver[0],"eid" : random:integer(100,2000) , "attrs": {"level": airflow_level}, "domain": "fan", "type": "airflow" })
+    } 
     fired {
-      null.klog("turned on fans with airflow level @ " + airflow_level);
+      airflow_level.klog("turned on fans with airflow level @ ");
     }
     else {
-      null.klog("failed to turn on its to hot outside.")
+      "failed to turn on its to hot outside".klog(".")
     }
   }
 
-    rule logicallyFanOff {
+  rule logicallyFanOff {
     select when esproto threshold_violation threshold_bound re#lower#
     pre {
-      airflow_level = 0;
+      airflow_level = 5;
       fan_driver = fan_collection_eci();
     }
-    //{
-    //  event:send({"cid": fan_driver[0] },"fan","airflow")
-    //    with attrs = {
-    //      "level" : airflow_level
-    //    };
-    //} // fan is off
+    if (true) then every {
+      event:send({"eci": fan_driver[0].klog("fan_driver"), "eid" : random:integer(100,2000).klog("random eid "), "domain": "fan".klog("domain "), "type": "airflow".klog("type ") , "attrs": {"level" : airflow_level}.klog("attrs ") }.klog("event:send param "))
+    } 
     always {
-      null.klog("turned off fans with airflow level @ " + airflow_level);
+      airflow_level.klog("turned off fans with airflow level @ ");
     }
   }
 }

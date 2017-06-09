@@ -5,7 +5,7 @@ ruleset fanController {
     author "PicoLabs"
     //description "General rules for Fan control"
 
-    use module wrangler
+    //use module wrangler
     
     logging on
     

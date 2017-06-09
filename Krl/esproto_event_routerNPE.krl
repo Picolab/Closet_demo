@@ -6,12 +6,13 @@ ruleset esproto_router {
     
     logging on
     
-    shares lastHeartbeat, lastHumidity, lastTemperature, lastPressure
+    shares lastHeartbeat, lastHumidity, lastTemperature, lastPressure ,__testing
     provides lastHeartbeat, lastHumidity, lastTemperature, lastPressure
   }
 
   global {
-
+    __testing = { "queries": [ { "name": "__testing" } ],
+                  "events": [ { "domain": "test", "type": "something"}]};
     // configuration
     healthy_battery_level = 20;
 
@@ -75,14 +76,14 @@ ruleset esproto_router {
     }
     if (sensor_data{"healthPercent"}) < healthy_battery_level then noop()
     fired {
-      null.klog("Battery is low");
+      sensor_data{"healthPercent"}.klog("Battery is low @ ");
       raise esproto event "battery_level_low"
         attributes {"sensor_id": sensor_id,
                     "properties": sensor_properties,
                     "health_percent": sensor_data{"healthPercent"},
                     "timestamp": time:now()}
     } else {
-      null.klog("Battery is fine");    
+      sensor_data{"healthPercent"}.klog("Battery is fine @ ");    
     }
   }
 
