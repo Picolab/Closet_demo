@@ -35,17 +35,17 @@ ruleset closetCollection {
 
     outside_temp = function (){
       ecis = EcisFromParams("subscriber_role","transmit_outside_temp").klog("ecis: ");
-      temp = common:skyQuery(ecis[0],"esproto_router","lastTemperature",{}).klog("tempf: ");
+      temp = common:skyQuery(ecis[0],"wovyn_router","lastTemperature",{}).klog("tempf: ");
       temp
     };
     inside_temp = function (){
       ecis = EcisFromParams("subscriber_role","transmit_inside_temp");
-      temp = common:skyQuery(ecis[0],"esproto_router","lastTemperature",{});
+      temp = common:skyQuery(ecis[0],"wovyn_router","lastTemperature",{});
       temp
     };
     temp_thresholds = function (){
       ecis = EcisFromParams("subscriber_role","transmit_inside_temp");
-      return = common:skyQuery(ecis[0],"esproto_device","thresholds",{ "threshold_type" : "temperature" });
+      return = common:skyQuery(ecis[0],"wovyn_device","thresholds",{ "threshold_type" : "temperature" });
       return
     };
     lower_threshold = function (){
@@ -87,12 +87,12 @@ ruleset closetCollection {
     };
 }
   rule save_inside_threshold {
-    select when esproto new_threshold
+    select when wovyn new_threshold
     pre {
       ecis = Ecis("subscriber_role","transmit_inside_temp");
     }
     every {
-      event:send({"eci": ecis[0],"eid" : random:integer(100,2000) , "attrs": event:attrs(), "domain": "esproto", "type": "new_threshold" })
+      event:send({"eci": ecis[0],"eid" : random:integer(100,2000) , "attrs": event:attrs(), "domain": "wovyn", "type": "new_threshold" })
     }
     always {
       "Setting threshold value for inside_temp".klog(".");
@@ -100,7 +100,7 @@ ruleset closetCollection {
   }
 
   rule logicallyFanOn {
-    select when esproto threshold_violation threshold_bound re#upper#
+    select when wovyn threshold_violation threshold_bound re#upper#
     pre {
       data = event:attr("reading").klog("data: ").decode();
       inside = data{"temperatureF"}.klog("inside temp: ");
@@ -124,7 +124,7 @@ ruleset closetCollection {
   }
 
   rule logicallyFanOff {
-    select when esproto threshold_violation threshold_bound re#lower#
+    select when wovyn threshold_violation threshold_bound re#lower#
     pre {
       airflow_level = 5;
       fan_driver = fan_collection_eci();
